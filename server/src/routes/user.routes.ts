@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import {
-  updateUserProfile,
   getUserProfile,
+  updateUserProfile,
   changePassword,
 } from '../controllers/user.controller';
 
@@ -15,9 +15,9 @@ router.get('/profile', getUserProfile);
 router.put(
   '/profile',
   [
-    body('firstName').optional().notEmpty().withMessage('First name cannot be empty'),
-    body('lastName').optional().notEmpty().withMessage('Last name cannot be empty'),
     body('email').optional().isEmail().withMessage('Please provide a valid email'),
+    body('firstName').optional(),
+    body('lastName').optional(),
     body('phone').optional(),
     body('bandName').optional(),
     body('genre').optional(),
