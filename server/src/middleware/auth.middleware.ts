@@ -3,74 +3,81 @@ import jwt from 'jsonwebtoken';
 import User from '../models/user.model';
 import logger from '../utils/logger';
 
-interface JwtPayload {
-  id: string;
-}
-
-// Extend Express Request interface to include user property
+// Extend the Express Request interface to include a user property
 declare global {
   namespace Express {
     interface Request {
-      user?: any;
+      user: {
+        id: string;
+      };
     }
   }
 }
 
-export const authenticate = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Get token from header
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        message: 'Authentication required. No token provided.',
-      });
+    let token;
+
+    // Check if token is in the Authorization header
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      // Get token from header
+      token = req.headers.authorization.split(' ')[1];
     }
 
-    const token = authHeader.split(' ')[1];
-    
-    // Verify token
-    const secret = process.env.JWT_SECRET || 'default_secret';
-    const decoded = jwt.verify(token, secret) as JwtPayload;
-    
-    // Find user by id
-    const user = await User.findByPk(decoded.id);
-    
-    if (!user) {
-      return res.status(401).json({
-        message: 'Invalid token. User not found.',
-      });
+    // Check if token exists
+    if (!token) {
+      return res.status(401).json({ message: 'Not authorized, no token' });
     }
-    
-    // Attach user to request
-    req.user = user;
-    next();
+
+    try {
+      // Verify token
+      const secret = process.env.JWT_SECRET || 'default_secret';
+      const decoded = jwt.verify(token, secret) as { id: string };
+
+      // Get user from the token
+      const user = await User.findByPk(decoded.id, {
+        attributes: ['id', 'email'],
+      });
+
+      if (!user) {
+        return res.status(401).json({ message: 'Not authorized, invalid token' });
+      }
+
+      // Check if user is active
+      if (!(await User.findOne({ where: { id: decoded.id, isActive: true } }))) {
+        return res.status(401).json({ message: 'Account is inactive' });
+      }
+
+      // Set user in request
+      req.user = { id: decoded.id };
+      next();
+    } catch (error) {
+      logger.error(`Token verification error: ${error}`);
+      return res.status(401).json({ message: 'Not authorized, invalid token' });
+    }
   } catch (error) {
     logger.error(`Authentication error: ${error}`);
-    return res.status(401).json({
-      message: 'Authentication failed. Invalid token.',
-    });
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
 export const authorize = (roles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return res.status(401).json({
-        message: 'Authentication required.',
-      });
-    }
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = await User.findByPk(req.user.id);
 
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        message: 'Forbidden. You do not have permission to access this resource.',
-      });
-    }
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
 
-    next();
+      if (!roles.includes(user.role)) {
+        return res.status(403).json({ message: 'Not authorized to access this resource' });
+      }
+
+      next();
+    } catch (error) {
+      logger.error(`Authorization error: ${error}`);
+      return res.status(500).json({ message: 'Server error' });
+    }
   };
 };
