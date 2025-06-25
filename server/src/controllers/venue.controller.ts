@@ -121,7 +121,7 @@ export const deleteVenue = async (req: Request, res: Response) => {
   }
 };
 
-// @desc    Get venues by city and country
+// @desc    Get venues by location
 // @route   GET /api/venues/location/:city/:country
 // @access  Private
 export const getVenuesByLocation = async (req: Request, res: Response) => {
@@ -132,10 +132,10 @@ export const getVenuesByLocation = async (req: Request, res: Response) => {
       where: {
         userId: req.user.id,
         city: {
-          [Op.iLike]: `%${city}%`,
+          [Op.like]: `%${city}%`,
         },
         country: {
-          [Op.iLike]: `%${country}%`,
+          [Op.like]: `%${country}%`,
         },
       },
       order: [['name', 'ASC']],
@@ -159,12 +159,11 @@ export const searchVenues = async (req: Request, res: Response) => {
       where: {
         userId: req.user.id,
         [Op.or]: [
-          { name: { [Op.iLike]: `%${query}%` } },
-          { address: { [Op.iLike]: `%${query}%` } },
-          { city: { [Op.iLike]: `%${query}%` } },
-          { state: { [Op.iLike]: `%${query}%` } },
-          { country: { [Op.iLike]: `%${query}%` } },
-          { venueType: { [Op.iLike]: `%${query}%` } },
+          { name: { [Op.like]: `%${query}%` } },
+          { city: { [Op.like]: `%${query}%` } },
+          { country: { [Op.like]: `%${query}%` } },
+          { venueType: { [Op.like]: `%${query}%` } },
+          { contactName: { [Op.like]: `%${query}%` } },
         ],
       },
       order: [['name', 'ASC']],
