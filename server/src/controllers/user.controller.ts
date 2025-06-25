@@ -34,19 +34,24 @@ export const updateUserProfile = async (req: Request, res: Response) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
+    // Prevent updating certain fields
+    const protectedFields = ['password', 'role', 'isActive', 'resetPasswordToken', 'resetPasswordExpire'];
+    protectedFields.forEach((field) => {
+      if (req.body[field]) {
+        delete req.body[field];
+      }
+    });
+
     const user = await User.findByPk(req.user.id);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Prevent updating sensitive fields
-    const { password, resetPasswordToken, resetPasswordExpire, role, ...updateData } = req.body;
-
     // Update user
-    await user.update(updateData);
+    await user.update(req.body);
 
-    // Return user without sensitive info
+    // Return updated user without sensitive fields
     const updatedUser = await User.findByPk(req.user.id, {
       attributes: { exclude: ['password', 'resetPasswordToken', 'resetPasswordExpire'] },
     });
