@@ -29,7 +29,7 @@ export const getInteractions = async (req: Request, res: Response) => {
   }
 };
 
-// @desc    Get a interaction by ID
+// @desc    Get an interaction by ID
 // @route   GET /api/interactions/:id
 // @access  Private
 export const getInteractionById = async (req: Request, res: Response) => {
@@ -43,7 +43,7 @@ export const getInteractionById = async (req: Request, res: Response) => {
         {
           model: Venue,
           as: 'venue',
-          attributes: ['id', 'name', 'city', 'country'],
+          attributes: ['id', 'name', 'city', 'country', 'address', 'venueType'],
         },
       ],
     });
@@ -68,18 +68,6 @@ export const createInteraction = async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
-    }
-
-    // Verify the venue exists and belongs to the user
-    const venue = await Venue.findOne({
-      where: {
-        id: req.body.venueId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!venue) {
-      return res.status(404).json({ message: 'Venue not found' });
     }
 
     // Add the user ID to the interaction data
@@ -122,20 +110,6 @@ export const updateInteraction = async (req: Request, res: Response) => {
 
     if (!interaction) {
       return res.status(404).json({ message: 'Interaction not found' });
-    }
-
-    // If venueId is changing, verify the new venue exists and belongs to the user
-    if (req.body.venueId && req.body.venueId !== interaction.venueId) {
-      const venue = await Venue.findOne({
-        where: {
-          id: req.body.venueId,
-          userId: req.user.id,
-        },
-      });
-
-      if (!venue) {
-        return res.status(404).json({ message: 'Venue not found' });
-      }
     }
 
     // Update interaction
@@ -191,18 +165,6 @@ export const getInteractionsByVenue = async (req: Request, res: Response) => {
   try {
     const { venueId } = req.params;
 
-    // Verify the venue exists and belongs to the user
-    const venue = await Venue.findOne({
-      where: {
-        id: venueId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!venue) {
-      return res.status(404).json({ message: 'Venue not found' });
-    }
-
     const interactions = await Interaction.findAll({
       where: {
         venueId,
@@ -218,22 +180,13 @@ export const getInteractionsByVenue = async (req: Request, res: Response) => {
   }
 };
 
-// @desc    Get upcoming follow-ups
-// @route   GET /api/interactions/followups
+// @desc    Get recent interactions
+// @route   GET /api/interactions/recent
 // @access  Private
-export const getUpcomingFollowUps = async (req: Request, res: Response) => {
+export const getRecentInteractions = async (req: Request, res: Response) => {
   try {
-    const today = new Date();
-    
     const interactions = await Interaction.findAll({
-      where: {
-        userId: req.user.id,
-        followUpDate: {
-          [Op.not]: null,
-          [Op.gte]: today,
-        },
-        isCompleted: false,
-      },
+      where: { userId: req.user.id },
       include: [
         {
           model: Venue,
@@ -241,12 +194,13 @@ export const getUpcomingFollowUps = async (req: Request, res: Response) => {
           attributes: ['id', 'name', 'city', 'country'],
         },
       ],
-      order: [['followUpDate', 'ASC']],
+      order: [['date', 'DESC']],
+      limit: 10,
     });
 
     res.json(interactions);
   } catch (error) {
-    logger.error(`Error fetching upcoming follow-ups: ${error}`);
+    logger.error(`Error fetching recent interactions: ${error}`);
     res.status(500).json({ message: 'Server error' });
   }
 };
