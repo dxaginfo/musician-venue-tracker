@@ -1,75 +1,75 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import compression from 'compression';
-import { rateLimit } from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { sequelize } from './db/config';
+import path from 'path';
+import { authenticate } from './middleware/auth.middleware';
+import { sequelize } from './config/database';
 import logger from './utils/logger';
-import routes from './routes';
+
+// Import routes
+import authRoutes from './routes/auth.routes';
+import userRoutes from './routes/user.routes';
+import venueRoutes from './routes/venue.routes';
+import interactionRoutes from './routes/interaction.routes';
+import performanceRoutes from './routes/performance.routes';
 
 // Load environment variables
 dotenv.config();
 
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 8000;
 
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Set up middleware
 app.use(cors());
 app.use(helmet());
-app.use(compression());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
-// Rate limiting
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api/', apiLimiter);
+// Define base routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', authenticate, userRoutes);
+app.use('/api/venues', authenticate, venueRoutes);
+app.use('/api/interactions', authenticate, interactionRoutes);
+app.use('/api/performances', authenticate, performanceRoutes);
 
-// Routes
-app.use('/api', routes);
+// Serve static assets in production
+if (process.env.NODE_ENV === 'production') {
+  // Set static folder
+  app.use(express.static(path.join(__dirname, '../../client/build')));
 
-// Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({ status: 'UP', timestamp: new Date() });
-});
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, '../../client', 'build', 'index.html'));
+  });
+}
 
-// 404 handler
-app.use((req: Request, res: Response) => {
+// Handle 404s
+app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-// Error handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  logger.error(`Error: ${err.message}`);
-  res.status(500).json({
-    message: 'Internal Server Error',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined,
+// Define port
+const PORT = process.env.PORT || 5000;
+
+// Connect to database and start server
+sequelize
+  .sync()
+  .then(() => {
+    app.listen(PORT, () => {
+      logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    logger.error(`Failed to connect to database: ${err}`);
   });
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err: Error) => {
+  logger.error(`Unhandled Rejection: ${err.message}`);
+  // Close server and exit process
+  process.exit(1);
 });
 
-// Database connection and server startup
-const startServer = async () => {
-  try {
-    // Test database connection
-    await sequelize.authenticate();
-    logger.info('Database connection has been established successfully.');
-
-    // Start server
-    app.listen(PORT, () => {
-      logger.info(`Server running on port ${PORT}`);
-    });
-  } catch (error) {
-    logger.error('Unable to connect to the database:', error);
-    process.exit(1);
-  }
-};
-
-startServer();
+export default app;
