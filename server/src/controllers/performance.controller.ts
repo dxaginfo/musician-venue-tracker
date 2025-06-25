@@ -43,7 +43,7 @@ export const getPerformanceById = async (req: Request, res: Response) => {
         {
           model: Venue,
           as: 'venue',
-          attributes: ['id', 'name', 'city', 'country', 'address', 'venueType', 'capacity'],
+          attributes: ['id', 'name', 'city', 'country', 'address', 'venueType'],
         },
       ],
     });
@@ -70,18 +70,6 @@ export const createPerformance = async (req: Request, res: Response) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    // Verify the venue exists and belongs to the user
-    const venue = await Venue.findOne({
-      where: {
-        id: req.body.venueId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!venue) {
-      return res.status(404).json({ message: 'Venue not found' });
-    }
-
     // Add the user ID to the performance data
     const performanceData = {
       ...req.body,
@@ -89,6 +77,17 @@ export const createPerformance = async (req: Request, res: Response) => {
     };
 
     const performance = await Performance.create(performanceData);
+
+    // Update the venue's lastPerformedAt date
+    await Venue.update(
+      { lastPerformedAt: performance.date },
+      {
+        where: {
+          id: performance.venueId,
+          userId: req.user.id,
+        },
+      }
+    );
 
     // Fetch the created performance with venue details
     const createdPerformance = await Performance.findByPk(performance.id, {
@@ -124,22 +123,21 @@ export const updatePerformance = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Performance not found' });
     }
 
-    // If venueId is changing, verify the new venue exists and belongs to the user
-    if (req.body.venueId && req.body.venueId !== performance.venueId) {
-      const venue = await Venue.findOne({
-        where: {
-          id: req.body.venueId,
-          userId: req.user.id,
-        },
-      });
-
-      if (!venue) {
-        return res.status(404).json({ message: 'Venue not found' });
-      }
-    }
-
     // Update performance
     await performance.update(req.body);
+
+    // If the date is updated, update the venue's lastPerformedAt date
+    if (req.body.date) {
+      await Venue.update(
+        { lastPerformedAt: req.body.date },
+        {
+          where: {
+            id: performance.venueId,
+            userId: req.user.id,
+          },
+        }
+      );
+    }
 
     // Fetch the updated performance with venue details
     const updatedPerformance = await Performance.findByPk(performance.id, {
@@ -177,6 +175,37 @@ export const deletePerformance = async (req: Request, res: Response) => {
 
     await performance.destroy();
 
+    // Update venue's lastPerformedAt with the most recent performance
+    const latestPerformance = await Performance.findOne({
+      where: {
+        venueId: performance.venueId,
+        userId: req.user.id,
+      },
+      order: [['date', 'DESC']],
+    });
+
+    if (latestPerformance) {
+      await Venue.update(
+        { lastPerformedAt: latestPerformance.date },
+        {
+          where: {
+            id: performance.venueId,
+            userId: req.user.id,
+          },
+        }
+      );
+    } else {
+      await Venue.update(
+        { lastPerformedAt: null },
+        {
+          where: {
+            id: performance.venueId,
+            userId: req.user.id,
+          },
+        }
+      );
+    }
+
     res.json({ message: 'Performance removed' });
   } catch (error) {
     logger.error(`Error deleting performance: ${error}`);
@@ -190,18 +219,6 @@ export const deletePerformance = async (req: Request, res: Response) => {
 export const getPerformancesByVenue = async (req: Request, res: Response) => {
   try {
     const { venueId } = req.params;
-
-    // Verify the venue exists and belongs to the user
-    const venue = await Venue.findOne({
-      where: {
-        id: venueId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!venue) {
-      return res.status(404).json({ message: 'Venue not found' });
-    }
 
     const performances = await Performance.findAll({
       where: {
@@ -225,7 +242,7 @@ export const getUpcomingPerformances = async (req: Request, res: Response) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const performances = await Performance.findAll({
       where: {
         userId: req.user.id,
@@ -258,7 +275,7 @@ export const getPastPerformances = async (req: Request, res: Response) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const performances = await Performance.findAll({
       where: {
         userId: req.user.id,
