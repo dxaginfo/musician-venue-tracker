@@ -1,40 +1,14 @@
-import { Model, DataTypes } from 'sequelize';
+import { Model, DataTypes, BeforeCreate, BeforeUpdate } from 'sequelize';
 import bcrypt from 'bcryptjs';
-import { sequelize } from '../db/config';
+import { sequelize } from '../config/database';
 
-export interface UserAttributes {
-  id: string;
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  role: string;
-  bandName?: string;
-  genre?: string;
-  website?: string;
-  bio?: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  isActive: boolean;
-  lastLogin?: Date;
-  resetPasswordToken?: string;
-  resetPasswordExpire?: Date;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-export interface UserCreationAttributes extends Omit<UserAttributes, 'id'> {}
-
-class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
+class User extends Model {
   public id!: string;
   public email!: string;
   public password!: string;
   public firstName!: string;
   public lastName!: string;
   public phone!: string;
-  public role!: string;
   public bandName!: string;
   public genre!: string;
   public website!: string;
@@ -42,14 +16,14 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
   public city!: string;
   public state!: string;
   public country!: string;
+  public role!: string;
   public isActive!: boolean;
-  public lastLogin!: Date;
   public resetPasswordToken!: string;
   public resetPasswordExpire!: Date;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
-  // Compare entered password with hashed password in database
+  // Custom method to match password
   public async matchPassword(enteredPassword: string): Promise<boolean> {
     return await bcrypt.compare(enteredPassword, this.password);
   }
@@ -73,79 +47,85 @@ User.init(
     password: {
       type: DataTypes.STRING,
       allowNull: false,
-      validate: {
-        len: [6, 100],
-      },
     },
     firstName: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     lastName: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     phone: {
       type: DataTypes.STRING,
-    },
-    role: {
-      type: DataTypes.ENUM('user', 'admin'),
-      defaultValue: 'user',
+      allowNull: true,
     },
     bandName: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     genre: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     website: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     bio: {
       type: DataTypes.TEXT,
+      allowNull: true,
     },
     city: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     state: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     country: {
       type: DataTypes.STRING,
+      allowNull: true,
+    },
+    role: {
+      type: DataTypes.STRING,
+      defaultValue: 'user',
+      allowNull: false,
     },
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
-    },
-    lastLogin: {
-      type: DataTypes.DATE,
+      allowNull: false,
     },
     resetPasswordToken: {
       type: DataTypes.STRING,
+      allowNull: true,
     },
     resetPasswordExpire: {
       type: DataTypes.DATE,
+      allowNull: true,
     },
   },
   {
     sequelize,
-    modelName: 'User',
-    tableName: 'users',
-    hooks: {
-      beforeCreate: async (user: User) => {
-        if (user.password) {
-          const salt = await bcrypt.genSalt(10);
-          user.password = await bcrypt.hash(user.password, salt);
-        }
-      },
-      beforeUpdate: async (user: User) => {
-        if (user.changed('password')) {
-          const salt = await bcrypt.genSalt(10);
-          user.password = await bcrypt.hash(user.password, salt);
-        }
-      },
-    },
+    modelName: 'user',
+    timestamps: true,
   }
 );
+
+// Hash password before save
+User.beforeCreate(async (user) => {
+  const salt = await bcrypt.genSalt(10);
+  user.password = await bcrypt.hash(user.password, salt);
+});
+
+// Hash password before update if changed
+User.beforeUpdate(async (user) => {
+  if (user.changed('password')) {
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(user.password, salt);
+  }
+});
 
 export default User;
