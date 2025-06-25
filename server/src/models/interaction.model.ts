@@ -1,50 +1,20 @@
 import { Model, DataTypes } from 'sequelize';
-import { sequelize } from '../db/config';
+import { sequelize } from '../config/database';
 import User from './user.model';
 import Venue from './venue.model';
 
-export interface InteractionAttributes {
-  id: string;
-  type: string; // email, call, meeting, message, other
-  date: Date;
-  subject: string;
-  description: string;
-  outcome: string;
-  followUpDate: Date | null;
-  contactName: string;
-  contactEmail: string;
-  contactPhone: string;
-  contactTitle: string;
-  isCompleted: boolean;
-  attachments: string[]; // URLs to stored files
-  notes: string;
-  tags: string[];
-  venueId: string;
-  userId: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-export interface InteractionCreationAttributes extends Omit<InteractionAttributes, 'id'> {}
-
-class Interaction extends Model<InteractionAttributes, InteractionCreationAttributes> implements InteractionAttributes {
+class Interaction extends Model {
   public id!: string;
-  public type!: string;
+  public userId!: string;
+  public venueId!: string;
+  public interactionType!: string; // email, call, meeting, etc.
   public date!: Date;
-  public subject!: string;
-  public description!: string;
-  public outcome!: string;
-  public followUpDate!: Date | null;
   public contactName!: string;
   public contactEmail!: string;
   public contactPhone!: string;
-  public contactTitle!: string;
-  public isCompleted!: boolean;
-  public attachments!: string[];
   public notes!: string;
-  public tags!: string[];
-  public venueId!: string;
-  public userId!: string;
+  public followUpDate!: Date;
+  public outcome!: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -56,60 +26,13 @@ Interaction.init(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    type: {
-      type: DataTypes.STRING,
+    userId: {
+      type: DataTypes.UUID,
       allowNull: false,
-      validate: {
-        isIn: [['email', 'call', 'meeting', 'message', 'other']],
+      references: {
+        model: 'users',
+        key: 'id',
       },
-    },
-    date: {
-      type: DataTypes.DATE,
-      allowNull: false,
-    },
-    subject: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    description: {
-      type: DataTypes.TEXT,
-    },
-    outcome: {
-      type: DataTypes.TEXT,
-    },
-    followUpDate: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
-    contactName: {
-      type: DataTypes.STRING,
-    },
-    contactEmail: {
-      type: DataTypes.STRING,
-      validate: {
-        isEmail: true,
-      },
-    },
-    contactPhone: {
-      type: DataTypes.STRING,
-    },
-    contactTitle: {
-      type: DataTypes.STRING,
-    },
-    isCompleted: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-    },
-    attachments: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      defaultValue: [],
-    },
-    notes: {
-      type: DataTypes.TEXT,
-    },
-    tags: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      defaultValue: [],
     },
     venueId: {
       type: DataTypes.UUID,
@@ -119,23 +42,47 @@ Interaction.init(
         key: 'id',
       },
     },
-    userId: {
-      type: DataTypes.UUID,
+    interactionType: {
+      type: DataTypes.STRING, // email, call, meeting, etc.
       allowNull: false,
-      references: {
-        model: 'users',
-        key: 'id',
-      },
+    },
+    date: {
+      type: DataTypes.DATE,
+      allowNull: false,
+    },
+    contactName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    contactEmail: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    contactPhone: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    followUpDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    outcome: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
   },
   {
     sequelize,
-    modelName: 'Interaction',
-    tableName: 'interactions',
+    modelName: 'interaction',
+    timestamps: true,
   }
 );
 
-// Associations
+// Set up associations
 Interaction.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 Interaction.belongsTo(Venue, { foreignKey: 'venueId', as: 'venue' });
 

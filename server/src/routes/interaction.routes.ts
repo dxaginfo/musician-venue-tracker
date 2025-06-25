@@ -7,7 +7,7 @@ import {
   updateInteraction,
   deleteInteraction,
   getInteractionsByVenue,
-  getUpcomingFollowUps,
+  getRecentInteractions,
 } from '../controllers/interaction.controller';
 
 const router = Router();
@@ -18,8 +18,8 @@ router.get('/', getInteractions);
 // Get interactions by venue
 router.get('/venue/:venueId', getInteractionsByVenue);
 
-// Get upcoming follow-ups
-router.get('/followups', getUpcomingFollowUps);
+// Get recent interactions
+router.get('/recent', getRecentInteractions);
 
 // Get interaction by ID
 router.get('/:id', getInteractionById);
@@ -28,10 +28,15 @@ router.get('/:id', getInteractionById);
 router.post(
   '/',
   [
-    body('type').notEmpty().withMessage('Interaction type is required'),
-    body('date').notEmpty().withMessage('Date is required'),
-    body('subject').notEmpty().withMessage('Subject is required'),
     body('venueId').notEmpty().withMessage('Venue ID is required'),
+    body('interactionType').notEmpty().withMessage('Interaction type is required'),
+    body('date').notEmpty().withMessage('Date is required'),
+    body('contactName').optional(),
+    body('contactEmail').optional().isEmail().withMessage('Please provide a valid email'),
+    body('contactPhone').optional(),
+    body('notes').optional(),
+    body('followUpDate').optional(),
+    body('outcome').optional(),
   ],
   createInteraction
 );
